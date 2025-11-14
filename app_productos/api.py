@@ -219,7 +219,11 @@ class ProductoCategoriaViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrar variantes con parámetros"""
-        queryset = Producto_Variantes.objects.select_related('producto')
+        queryset = Producto_Variantes.objects.select_related(
+            'producto', 
+            'producto__Categoria', 
+            'Inventario_id'
+        )
         
         # Filtro por producto
         producto_id = self.request.query_params.get('producto', None)
@@ -248,6 +252,15 @@ class ProductoCategoriaViewSet(viewsets.ModelViewSet):
             'count': queryset.count(),
             'variantes': serializer.data
         })
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Obtener una variante específica con toda su información"""
+        variante = self.get_object()
+        serializer = self.get_serializer(variante)
+        
+        # Devolver directamente el objeto serializado (no en 'variante')
+        # para que coincida con lo que espera el frontend
+        return Response(serializer.data)
     
     def create(self, request, *args, **kwargs):
         """Crear nueva variante de producto"""
@@ -451,12 +464,7 @@ class InventarioViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrar inventario con parámetros"""
-        queryset = Inventario.objects.select_related('Producto_id').all()
-        
-        # Filtro por producto
-        producto_id = self.request.query_params.get('producto', None)
-        if producto_id:
-            queryset = queryset.filter(Producto_id_id=producto_id)
+        queryset = Inventario.objects.all()
         
         # Filtro por ubicación
         ubicacion = self.request.query_params.get('ubicacion', None)
@@ -548,3 +556,33 @@ class InventarioViewSet(viewsets.ModelViewSet):
                 }
             }
         })
+    
+    @action(detail=False, methods=['get'])
+    def por_variante(self, request):
+        """Obtener inventario de una variante específica"""
+        variante_id = request.query_params.get('variante', None)
+        
+        if not variante_id:
+            return Response({
+                'success': False,
+                'error': 'Se requiere el parámetro variante'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            variante = Producto_Variantes.objects.get(id=variante_id)
+            if variante.Inventario_id:
+                serializer = self.get_serializer(variante.Inventario_id)
+                return Response({
+                    'success': True,
+                    'inventario': serializer.data
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'message': 'Esta variante no tiene inventario asignado'
+                }, status=status.HTTP_404_NOT_FOUND)
+        except Producto_Variantes.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Variante no encontrada'
+            }, status=status.HTTP_404_NOT_FOUND)

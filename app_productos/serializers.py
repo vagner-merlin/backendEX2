@@ -50,15 +50,47 @@ class ProductoBasicoSerializer(serializers.ModelSerializer):
 class ProductoCategoriaSerializer(serializers.ModelSerializer):
     """Serializer completo para variantes de productos"""
     producto_info = ProductoBasicoSerializer(source='producto', read_only=True)
+    categoria_info = serializers.SerializerMethodField()
     imagenes = serializers.SerializerMethodField()
     imagen_principal = serializers.SerializerMethodField()
+    stock = serializers.SerializerMethodField()
+    inventario_info = serializers.SerializerMethodField()
     
     class Meta:
         model = Producto_Variantes
         fields = [
             'id', 'producto', 'color', 'talla', 'precio_unitario', 
-            'fecha_creacion', 'activo', 'producto_info', 'imagenes', 'imagen_principal'
+            'fecha_creacion', 'activo', 'Inventario_id', 'producto_info', 
+            'categoria_info', 'imagenes', 'imagen_principal', 'stock', 'inventario_info'
         ]
+    
+    def get_categoria_info(self, obj):
+        """Obtener información de la categoría del producto"""
+        if obj.producto and obj.producto.Categoria:
+            return CategoriaBasicaSerializer(obj.producto.Categoria).data
+        return None
+    
+    def get_stock(self, obj):
+        """
+        Obtener stock de la variante desde su inventario.
+        Si no tiene inventario asociado, retorna 0.
+        """
+        if obj.Inventario_id:
+            return obj.Inventario_id.stock
+        return 0  # Sin inventario
+    
+    def get_inventario_info(self, obj):
+        """Obtener información completa del inventario si existe"""
+        if obj.Inventario_id:
+            return {
+                'id': obj.Inventario_id.id,
+                'stock': obj.Inventario_id.stock,
+                'stock_minimo': obj.Inventario_id.stock_minimo,
+                'stock_maximo': obj.Inventario_id.stock_maximo,
+                'ubicacion_almacen': obj.Inventario_id.ubicacion_almacen,
+                'ultima_actualizacion': obj.Inventario_id.ultima_actualizacion
+            }
+        return None
     
     def get_imagenes(self, obj):
         """Obtener todas las imágenes del producto"""
@@ -79,7 +111,7 @@ class ProductoCategoriaCreateSerializer(serializers.ModelSerializer):
     """Serializer para crear/actualizar variantes de productos"""
     class Meta:
         model = Producto_Variantes
-        fields = ['producto', 'color', 'talla', 'precio_unitario', 'activo']
+        fields = ['producto', 'color', 'talla', 'precio_unitario', 'activo', 'Inventario_id']
     
     def validate_precio_unitario(self, value):
         if value <= 0:
@@ -178,15 +210,27 @@ class ItemComprasSerializer(serializers.ModelSerializer):
 
 class InventarioSerializer(serializers.ModelSerializer):
     """Serializer para inventario de productos"""
-    producto_info = ProductoBasicoSerializer(source='Producto_id', read_only=True)
+    variantes = serializers.SerializerMethodField()
     
     class Meta:
         model = Inventario
         fields = [
             'id', 'stock', 'stock_minimo', 'stock_maximo',
-            'ubicacion_almacen', 'ultima_actualizacion', 'Producto_id', 'producto_info'
+            'ubicacion_almacen', 'ultima_actualizacion', 'variantes'
         ]
         read_only_fields = ['ultima_actualizacion']
+    
+    def get_variantes(self, obj):
+        """Obtener todas las variantes que usan este inventario"""
+        variantes = Producto_Variantes.objects.filter(Inventario_id=obj)
+        # Usar un serializer simple para evitar recursión infinita
+        return [{
+            'id': v.id,
+            'producto_nombre': v.producto.nombre,
+            'color': v.color,
+            'talla': v.talla,
+            'precio_unitario': str(v.precio_unitario)
+        } for v in variantes]
     
     def validate_stock(self, value):
         if value < 0:

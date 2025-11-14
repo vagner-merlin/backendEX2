@@ -24,6 +24,7 @@ class Producto_Variantes(models.Model):
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     activo = models.BooleanField(default=True)
+    Inventario_id = models.ForeignKey('Inventario', on_delete=models.CASCADE , null=True)
 
 
 class Comentarios(models.Model):
@@ -61,5 +62,4 @@ class Inventario (models.Model):
     stock_maximo = models.IntegerField()
     ubicacion_almacen = models.CharField(max_length=100)
     ultima_actualizacion = models.DateTimeField(auto_now=True)
-    Producto_id = models.ForeignKey(Producto, on_delete=models.CASCADE) 
 
