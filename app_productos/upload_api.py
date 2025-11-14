@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
-from app_productos.models import Imagen_Producto, ProductoCategoria
+from app_productos.models import Imagen_Producto, Producto_Variantes
 from app_productos.serializers import ImagenProductoSerializer
 import os
 
@@ -47,8 +47,8 @@ class ImageUploadAPIView(APIView):
             
             # Validar que existe el producto_categoria
             try:
-                producto_categoria = ProductoCategoria.objects.get(id=producto_categoria_id)
-            except ProductoCategoria.DoesNotExist:
+                producto_categoria = Producto_Variantes.objects.get(id=producto_categoria_id)
+            except Producto_Variantes.DoesNotExist:
                 return Response({
                     'success': False,
                     'error': f'No existe producto_categoria con ID {producto_categoria_id}'

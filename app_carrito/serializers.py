@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Carrito, ItemCarrito
-from app_productos.models import Producto, ProductoCategoria, Imagen_Producto
+from app_productos.models import Producto, Producto_Variantes, Imagen_Producto
 from app_Cliente.models import Cliente
 
 class ProductoBasicoSerializer(serializers.ModelSerializer):
@@ -17,7 +17,7 @@ class ProductoCategoriaBasicoSerializer(serializers.ModelSerializer):
     imagen_principal = serializers.SerializerMethodField()
     
     class Meta:
-        model = ProductoCategoria
+        model = Producto_Variantes
         fields = [
             'id', 'producto', 'categoria', 'color', 'talla', 'capacidad', 
             'precio_unitario', 'stock', 'producto_info', 'categoria_info',
@@ -127,9 +127,9 @@ class AgregarItemCarritoSerializer(serializers.Serializer):
     
     def validate_producto_variante_id(self, value):
         try:
-            producto = ProductoCategoria.objects.get(id=value)
+            producto = Producto_Variantes.objects.get(id=value)
             if not producto.stock or producto.stock <= 0:
                 raise serializers.ValidationError("Producto sin stock disponible")
             return value
-        except ProductoCategoria.DoesNotExist:
+        except Producto_Variantes.DoesNotExist:
             raise serializers.ValidationError("Producto no encontrado")

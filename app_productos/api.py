@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q, Avg, F
 from .models import (
-    Producto, Categoria, ProductoCategoria, reseña, 
+    Producto, Categoria, Producto_Variantes, Comentarios, 
     Imagen_Producto, item_pedido, item_compras, Inventario
 )
 from .serializers import (
@@ -161,7 +161,7 @@ class ProductoCategoriaViewSet(viewsets.ModelViewSet):
     """
     ViewSet para variantes de productos - PÚBLICO para ver, AUTENTICADO para modificar
     """
-    queryset = ProductoCategoria.objects.all()
+    queryset = Producto_Variantes.objects.all()
     serializer_class = ProductoCategoriaSerializer
     
     def get_serializer_class(self):
@@ -181,7 +181,7 @@ class ProductoCategoriaViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrar variantes con parámetros"""
-        queryset = ProductoCategoria.objects.select_related('producto', 'categoria')
+        queryset = Producto_Variantes.objects.select_related('producto', 'categoria')
         
         # Filtro por producto
         producto_id = self.request.query_params.get('producto', None)
@@ -216,7 +216,7 @@ class ReseñaViewSet(viewsets.ModelViewSet):
     """
     ViewSet para reseñas - PÚBLICO para leer, AUTENTICADO para crear
     """
-    queryset = reseña.objects.all()
+    queryset = Comentarios.objects.all()
     serializer_class = ReseñaSerializer
     
     def get_serializer_class(self):
@@ -235,7 +235,7 @@ class ReseñaViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrar reseñas por producto"""
-        queryset = reseña.objects.select_related('Cliente', 'Producto_categoria')
+        queryset = Comentarios.objects.select_related('Cliente', 'Producto_categoria')
         
         producto_variante = self.request.query_params.get('producto_variante', None)
         if producto_variante:

@@ -9,7 +9,7 @@ from .serializers import (
     ItemCarritoSerializer, 
     AgregarItemCarritoSerializer
 )
-from app_productos.models import ProductoCategoria
+from app_productos.models import Producto_Variantes
 from app_Cliente.models import Cliente
 
 class CarritoViewSet(viewsets.ModelViewSet):
@@ -67,7 +67,7 @@ class CarritoViewSet(viewsets.ModelViewSet):
             cantidad = serializer.validated_data['cantidad']
             
             try:
-                producto_variante = ProductoCategoria.objects.get(id=producto_variante_id)
+                producto_variante = Producto_Variantes.objects.get(id=producto_variante_id)
                 
                 # Verificar stock disponible
                 if producto_variante.stock < cantidad:
@@ -115,7 +115,7 @@ class CarritoViewSet(viewsets.ModelViewSet):
                         'item': item_serializer.data
                     }, status=status.HTTP_201_CREATED)
                     
-            except ProductoCategoria.DoesNotExist:
+            except Producto_Variantes.DoesNotExist:
                 return Response({
                     'success': False,
                     'message': 'Producto no encontrado'

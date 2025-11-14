@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 ENUM_CHOICES = [
     ('tarjeta_credito', 'tarjeta_credito'),
     ('qr', 'qr'),
-    ('efectivo', 'efectivo'),
+    ('por_pagar', 'por_pagar'),
 ]
 
 # Create your models here.
@@ -17,8 +17,7 @@ class Cliente(models.Model):
 
 
 class Metodo_Pago(models.Model):
-    forma_pago = models.CharField(max_length=50, choices=ENUM_CHOICES, default='efectivo')
-    detalles_pago = models.CharField(max_length=200 , null=True, blank=True)
+    tipo_pago =  models.CharField(max_length=50, choices=ENUM_CHOICES , default='por_pagar' , null =True)
     Cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE , null=True)
 
 

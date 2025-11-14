@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    Producto, Categoria, ProductoCategoria, reseña, 
+    Producto, Categoria, Producto_Variantes , Comentarios, 
     Imagen_Producto, item_pedido, item_compras, Inventario
 )
 from app_Cliente.serializers import ClienteSerializer
@@ -53,7 +53,7 @@ class ProductoCategoriaSerializer(serializers.ModelSerializer):
     imagen_principal = serializers.SerializerMethodField()
     
     class Meta:
-        model = ProductoCategoria
+        model = Producto_Variantes
         fields = [
             'id', 'producto', 'categoria', 'color', 'talla', 'capacidad',
             'precio_variante', 'precio_unitario', 'stock', 'fecha_creacion',
@@ -78,7 +78,7 @@ class ProductoCategoriaSerializer(serializers.ModelSerializer):
 class ProductoCategoriaCreateSerializer(serializers.ModelSerializer):
     """Serializer para crear/actualizar variantes de productos"""
     class Meta:
-        model = ProductoCategoria
+        model = Producto_Variantes
         fields = [
             'producto', 'categoria', 'color', 'talla', 'capacidad',
             'precio_variante', 'precio_unitario', 'stock'
@@ -104,7 +104,7 @@ class ReseñaSerializer(serializers.ModelSerializer):
     cliente_info = ClienteSerializer(source='Cliente', read_only=True)
     
     class Meta:
-        model = reseña
+        model = Comentarios
         fields = [
             'id', 'calificacion', 'comentario', 'fecha_reseña',
             'Producto_categoria', 'Cliente', 'cliente_info'
@@ -119,7 +119,7 @@ class ReseñaSerializer(serializers.ModelSerializer):
 class ReseñaCreateSerializer(serializers.ModelSerializer):
     """Serializer para crear reseñas"""
     class Meta:
-        model = reseña
+        model = Comentarios
         fields = ['calificacion', 'comentario', 'Producto_categoria', 'Cliente']
     
     def validate_calificacion(self, value):
@@ -141,7 +141,7 @@ class ProductoCompletoSerializer(serializers.ModelSerializer):
     
     def get_variantes(self, obj):
         """Obtener todas las variantes del producto"""
-        variantes = ProductoCategoria.objects.filter(producto=obj)
+        variantes = Producto_Variantes.objects.filter(producto=obj)
         print(f"🎨 Serializando variantes para {obj.nombre}: {variantes.count()} variantes")
         
         serialized_data = ProductoCategoriaSerializer(variantes, many=True).data
