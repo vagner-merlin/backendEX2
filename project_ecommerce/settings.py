@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-b=a##v6kw8@yrekmr2b3c&)p_lw=yt)8_m6-331!wreiyllnl1
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['3.86.0.53', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -75,6 +75,8 @@ ROOT_URLCONF = 'project_ecommerce.urls'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite React (desarrollo)
     "http://127.0.0.1:5173",
+    "http://3.86.0.53",  # Frontend en producción
+    "http://3.86.0.53:5173",  # Frontend en producción con puerto alternativo
 ]
 
 # Opcional: Permitir cookies/credenciales en peticiones CORS
