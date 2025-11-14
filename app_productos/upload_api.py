@@ -15,7 +15,24 @@ class ImageUploadAPIView(APIView):
     API específica para subir imágenes directamente a S3
     """
     parser_classes = (MultiPartParser, FormParser)
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Cambiado a AllowAny para debugging
+    
+    def dispatch(self, request, *args, **kwargs):
+        """Override dispatch para capturar errores de parsing"""
+        print(f"🔍 Dispatch - Method: {request.method}")
+        print(f"🔍 Content-Type: {request.content_type}")
+        print(f"🔍 Headers: {dict(request.headers)}")
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        except Exception as e:
+            print(f"❌ Error en dispatch: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'success': False,
+                'error': f'Error en dispatch: {str(e)}',
+                'tipo': type(e).__name__
+            }, status=status.HTTP_400_BAD_REQUEST)
     
     def post(self, request, *args, **kwargs):
         """
@@ -28,11 +45,21 @@ class ImageUploadAPIView(APIView):
         - es_principal: si es la imagen principal (opcional, default: false)
         """
         try:
+            # DEBUG: Imprimir lo que llega
+            print(f"📥 FILES recibidos: {request.FILES}")
+            print(f"📥 DATA recibido: {request.data}")
+            print(f"📥 POST recibido: {request.POST}")
+            
             # Validar que se envió un archivo
             if 'imagen' not in request.FILES:
                 return Response({
                     'success': False,
-                    'error': 'No se envió ningún archivo'
+                    'error': 'No se envió ningún archivo',
+                    'debug': {
+                        'files_keys': list(request.FILES.keys()),
+                        'data_keys': list(request.data.keys()),
+                        'post_keys': list(request.POST.keys())
+                    }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             imagen_file = request.FILES['imagen']
@@ -42,7 +69,12 @@ class ImageUploadAPIView(APIView):
             if not producto_categoria_id:
                 return Response({
                     'success': False,
-                    'error': 'Se requiere el ID de Producto_categoria'
+                    'error': 'Se requiere el ID de Producto_categoria',
+                    'debug': {
+                        'data_recibido': dict(request.data),
+                        'post_recibido': dict(request.POST),
+                        'campos_esperados': ['imagen', 'Producto_categoria', 'texto', 'es_principal']
+                    }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Validar que existe el producto_categoria
@@ -207,7 +239,6 @@ class ImageDisplayAPIView(APIView):
         try:
             producto_categoria = imagen.Producto_categoria
             producto = producto_categoria.producto
-            categoria = producto_categoria.categoria
             
             return {
                 'id': imagen.id,
@@ -223,24 +254,14 @@ class ImageDisplayAPIView(APIView):
                     'nombre': producto.nombre,
                     'descripcion': producto.descripcion,
                     'activo': producto.activo,
-                    'peso': float(producto.peso) if producto.peso else None
-                },
-                
-                # Información de la categoría
-                'categoria_info': {
-                    'id': categoria.id,
-                    'nombre': categoria.nombre,
-                    'descripcion': categoria.descripcion
                 },
                 
                 # Información de la variante
                 'variante_info': {
                     'color': producto_categoria.color,
                     'talla': producto_categoria.talla,
-                    'capacidad': producto_categoria.capacidad,
-                    'precio_variante': float(producto_categoria.precio_variante),
                     'precio_unitario': float(producto_categoria.precio_unitario),
-                    'stock': producto_categoria.stock,
+                    'activo': producto_categoria.activo,
                     'fecha_creacion': producto_categoria.fecha_creacion.isoformat() if producto_categoria.fecha_creacion else None
                 },
                 

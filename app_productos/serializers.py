@@ -41,23 +41,23 @@ class ImagenProductoSerializer(serializers.ModelSerializer):
 
 class ProductoBasicoSerializer(serializers.ModelSerializer):
     """Serializer básico para productos"""
+    categoria_info = CategoriaBasicaSerializer(source='Categoria', read_only=True)
+    
     class Meta:
         model = Producto
-        fields = ['id', 'nombre', 'descripcion', 'activo', 'fecha_creacion', 'peso']
+        fields = ['id', 'nombre', 'Categoria', 'descripcion', 'activo', 'fecha_creacion', 'categoria_info']
 
 class ProductoCategoriaSerializer(serializers.ModelSerializer):
     """Serializer completo para variantes de productos"""
     producto_info = ProductoBasicoSerializer(source='producto', read_only=True)
-    categoria_info = CategoriaBasicaSerializer(source='categoria', read_only=True)
     imagenes = serializers.SerializerMethodField()
     imagen_principal = serializers.SerializerMethodField()
     
     class Meta:
         model = Producto_Variantes
         fields = [
-            'id', 'producto', 'categoria', 'color', 'talla', 'capacidad',
-            'precio_variante', 'precio_unitario', 'stock', 'fecha_creacion',
-            'producto_info', 'categoria_info', 'imagenes', 'imagen_principal'
+            'id', 'producto', 'color', 'talla', 'precio_unitario', 
+            'fecha_creacion', 'activo', 'producto_info', 'imagenes', 'imagen_principal'
         ]
     
     def get_imagenes(self, obj):
@@ -79,24 +79,11 @@ class ProductoCategoriaCreateSerializer(serializers.ModelSerializer):
     """Serializer para crear/actualizar variantes de productos"""
     class Meta:
         model = Producto_Variantes
-        fields = [
-            'producto', 'categoria', 'color', 'talla', 'capacidad',
-            'precio_variante', 'precio_unitario', 'stock'
-        ]
-    
-    def validate_precio_variante(self, value):
-        if value < 0:
-            raise serializers.ValidationError("El precio variante no puede ser negativo")
-        return value
+        fields = ['producto', 'color', 'talla', 'precio_unitario', 'activo']
     
     def validate_precio_unitario(self, value):
         if value <= 0:
             raise serializers.ValidationError("El precio unitario debe ser mayor a 0")
-        return value
-    
-    def validate_stock(self, value):
-        if value < 0:
-            raise serializers.ValidationError("El stock no puede ser negativo")
         return value
 
 class ReseñaSerializer(serializers.ModelSerializer):
@@ -130,13 +117,13 @@ class ReseñaCreateSerializer(serializers.ModelSerializer):
 class ProductoCompletoSerializer(serializers.ModelSerializer):
     """Serializer completo para productos con todas sus variantes"""
     variantes = serializers.SerializerMethodField()
-    categorias = serializers.SerializerMethodField()
+    categoria_info = CategoriaBasicaSerializer(source='Categoria', read_only=True)
     
     class Meta:
         model = Producto
         fields = [
-            'id', 'nombre', 'descripcion', 'activo', 'fecha_creacion', 
-            'peso', 'variantes', 'categorias'
+            'id', 'nombre', 'Categoria', 'descripcion', 'activo', 'fecha_creacion', 
+            'categoria_info', 'variantes'
         ]
     
     def get_variantes(self, obj):
@@ -196,14 +183,14 @@ class InventarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Inventario
         fields = [
-            'id', 'cantidad_entradas', 'stock_minimo', 'stock_maximo',
+            'id', 'stock', 'stock_minimo', 'stock_maximo',
             'ubicacion_almacen', 'ultima_actualizacion', 'Producto_id', 'producto_info'
         ]
         read_only_fields = ['ultima_actualizacion']
     
-    def validate_cantidad_entradas(self, value):
+    def validate_stock(self, value):
         if value < 0:
-            raise serializers.ValidationError("La cantidad de entradas no puede ser negativa")
+            raise serializers.ValidationError("El stock no puede ser negativo")
         return value
     
     def validate_stock_minimo(self, value):

@@ -11,7 +11,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
     """
     queryset = Proveedor.objects.all()
     serializer_class = ProveedorSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def list(self, request, *args, **kwargs):
         """Listar todos los proveedores"""

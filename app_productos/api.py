@@ -23,7 +23,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrar productos con parámetros opcionales"""
-        queryset = Producto.objects.filter(activo=True)
+        queryset = Producto.objects.select_related('Categoria').filter(activo=True)
         
         # Filtro por nombre
         nombre = self.request.query_params.get('nombre', None)
@@ -33,42 +33,23 @@ class ProductoViewSet(viewsets.ModelViewSet):
         # Filtro por categoría
         categoria = self.request.query_params.get('categoria', None)
         if categoria:
-            queryset = queryset.filter(productocategoria__categoria_id=categoria).distinct()
+            queryset = queryset.filter(Categoria_id=categoria)
         
         return queryset.order_by('-fecha_creacion')
     
     def list(self, request, *args, **kwargs):
         """Listar productos del catálogo"""
-        print("🔍 API: Iniciando listado de productos...")
-        
         queryset = self.get_queryset()
-        print(f"📦 API: Productos en queryset: {queryset.count()}")
-        
-        # Debug: Mostrar productos activos
-        total_productos = Producto.objects.count()
-        productos_activos = Producto.objects.filter(activo=True).count()
-        print(f"📊 API: Total productos en DB: {total_productos}")
-        print(f"✅ API: Productos activos en DB: {productos_activos}")
-        
-        # Mostrar algunos productos para debug
-        for producto in queryset[:3]:  # Solo primeros 3
-            print(f"   - {producto.nombre} (ID: {producto.id}, Activo: {producto.activo})")
-            variantes = producto.productocategoria_set.count()
-            print(f"     Variantes: {variantes}")
-        
-        serializer = ProductoCompletoSerializer(queryset, many=True)  # Vista completa con variantes e imágenes
-        data = serializer.data
-        
-        print(f"📤 API: Datos serializados: {len(data)} productos")
+        serializer = self.get_serializer(queryset, many=True)
         
         return Response({
             'success': True,
             'count': queryset.count(),
-            'productos': data
+            'productos': serializer.data
         })
     
     def retrieve(self, request, *args, **kwargs):
-        """Obtener producto completo con todas sus variantes"""
+        """Obtener producto completo con sus variantes"""
         producto = self.get_object()
         serializer = self.get_serializer(producto)
         
@@ -77,10 +58,47 @@ class ProductoViewSet(viewsets.ModelViewSet):
             'producto': serializer.data
         })
     
+    def create(self, request, *args, **kwargs):
+        """Crear nuevo producto"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        return Response({
+            'success': True,
+            'message': 'Producto creado exitosamente',
+            'producto': serializer.data
+        }, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        """Actualizar producto completo"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response({
+            'success': True,
+            'message': 'Producto actualizado exitosamente',
+            'producto': serializer.data
+        })
+    
+    def destroy(self, request, *args, **kwargs):
+        """Eliminar producto (soft delete - marcar como inactivo)"""
+        instance = self.get_object()
+        instance.activo = False
+        instance.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Producto desactivado exitosamente'
+        }, status=status.HTTP_200_OK)
+    
     def get_permissions(self):
         """Permisos dinámicos: solo lectura pública, escritura autenticada"""
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [permissions.IsAuthenticated]
+            permission_classes = [permissions.AllowAny]
         else:
             permission_classes = [permissions.AllowAny]
         
@@ -102,7 +120,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
     def variantes(self, request, pk=None):
         """Obtener todas las variantes de un producto específico"""
         producto = self.get_object()
-        variantes = ProductoCategoria.objects.filter(producto=producto)
+        variantes = Producto_Variantes.objects.filter(producto=producto)
         serializer = ProductoCategoriaSerializer(variantes, many=True)
         
         return Response({
@@ -110,6 +128,26 @@ class ProductoViewSet(viewsets.ModelViewSet):
             'producto': producto.nombre,
             'count': variantes.count(),
             'variantes': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def por_categoria(self, request):
+        """Obtener productos filtrados por categoría"""
+        categoria_id = request.query_params.get('categoria_id')
+        
+        if not categoria_id:
+            return Response({
+                'success': False,
+                'message': 'categoria_id es requerido'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        productos = self.queryset.filter(Categoria_id=categoria_id)
+        serializer = self.get_serializer(productos, many=True)
+        
+        return Response({
+            'success': True,
+            'count': productos.count(),
+            'productos': serializer.data
         })
 
 class CategoriaViewSet(viewsets.ModelViewSet):
@@ -181,36 +219,72 @@ class ProductoCategoriaViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrar variantes con parámetros"""
-        queryset = Producto_Variantes.objects.select_related('producto', 'categoria')
+        queryset = Producto_Variantes.objects.select_related('producto')
         
         # Filtro por producto
         producto_id = self.request.query_params.get('producto', None)
         if producto_id:
             queryset = queryset.filter(producto_id=producto_id)
         
-        # Filtro por categoría
-        categoria_id = self.request.query_params.get('categoria', None)
-        if categoria_id:
-            queryset = queryset.filter(categoria_id=categoria_id)
+        # Filtro por color
+        color = self.request.query_params.get('color', None)
+        if color:
+            queryset = queryset.filter(color__icontains=color)
         
-        # Filtro por disponibilidad
-        disponible = self.request.query_params.get('disponible', None)
-        if disponible == 'true':
-            queryset = queryset.filter(stock__gt=0)
+        # Filtro por talla
+        talla = self.request.query_params.get('talla', None)
+        if talla:
+            queryset = queryset.filter(talla__icontains=talla)
         
         return queryset.order_by('-fecha_creacion')
     
-    @action(detail=False, methods=['get'])
-    def disponibles(self, request):
-        """Variantes con stock disponible"""
-        variantes_disponibles = self.queryset.filter(stock__gt=0)
-        serializer = self.get_serializer(variantes_disponibles, many=True)
+    def list(self, request, *args, **kwargs):
+        """Listar variantes de productos"""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
         
         return Response({
             'success': True,
-            'count': variantes_disponibles.count(),
+            'count': queryset.count(),
             'variantes': serializer.data
         })
+    
+    def create(self, request, *args, **kwargs):
+        """Crear nueva variante de producto"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        return Response({
+            'success': True,
+            'message': 'Variante creada exitosamente',
+            'variante': serializer.data
+        }, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        """Actualizar variante completa"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response({
+            'success': True,
+            'message': 'Variante actualizada exitosamente',
+            'variante': serializer.data
+        })
+    
+    def destroy(self, request, *args, **kwargs):
+        """Eliminar variante (soft delete)"""
+        instance = self.get_object()
+        instance.activo = False
+        instance.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Variante desactivada exitosamente'
+        }, status=status.HTTP_200_OK)
 
 class ReseñaViewSet(viewsets.ModelViewSet):
     """
@@ -285,13 +359,71 @@ class ImagenProductoViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrar imágenes por producto variante"""
-        queryset = Imagen_Producto.objects.all()
+        queryset = Imagen_Producto.objects.select_related('Producto_categoria__producto')
         
+        # Filtro por variante de producto
         producto_categoria = self.request.query_params.get('producto_categoria', None)
         if producto_categoria:
             queryset = queryset.filter(Producto_categoria_id=producto_categoria)
         
+        # Filtro por producto base
+        producto = self.request.query_params.get('producto', None)
+        if producto:
+            queryset = queryset.filter(Producto_categoria__producto_id=producto)
+        
+        # Filtro solo principales
+        solo_principales = self.request.query_params.get('solo_principales', None)
+        if solo_principales == 'true':
+            queryset = queryset.filter(es_principal=True)
+        
         return queryset.order_by('-es_principal', 'id')
+    
+    def list(self, request, *args, **kwargs):
+        """Listar imágenes de productos"""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return Response({
+            'success': True,
+            'count': queryset.count(),
+            'imagenes': serializer.data
+        })
+    
+    def create(self, request, *args, **kwargs):
+        """Crear nueva imagen de producto"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        return Response({
+            'success': True,
+            'message': 'Imagen creada exitosamente',
+            'imagen': serializer.data
+        }, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        """Actualizar imagen completa"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response({
+            'success': True,
+            'message': 'Imagen actualizada exitosamente',
+            'imagen': serializer.data
+        })
+    
+    def destroy(self, request, *args, **kwargs):
+        """Eliminar imagen"""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        
+        return Response({
+            'success': True,
+            'message': 'Imagen eliminada exitosamente'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 class ItemPedidoViewSet(viewsets.ModelViewSet):
     """
@@ -299,7 +431,7 @@ class ItemPedidoViewSet(viewsets.ModelViewSet):
     """
     queryset = item_pedido.objects.all()
     serializer_class = ItemPedidoSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
 class ItemComprasViewSet(viewsets.ModelViewSet):
     """
@@ -315,7 +447,7 @@ class InventarioViewSet(viewsets.ModelViewSet):
     """
     queryset = Inventario.objects.all()
     serializer_class = InventarioSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get_queryset(self):
         """Filtrar inventario con parámetros"""
@@ -331,10 +463,10 @@ class InventarioViewSet(viewsets.ModelViewSet):
         if ubicacion:
             queryset = queryset.filter(ubicacion_almacen__icontains=ubicacion)
         
-        # Filtro por stock bajo (cantidad_entradas menor que stock_minimo)
+        # Filtro por stock bajo (stock menor que stock_minimo)
         stock_bajo = self.request.query_params.get('stock_bajo', None)
         if stock_bajo == 'true':
-            queryset = queryset.filter(cantidad_entradas__lt=F('stock_minimo'))
+            queryset = queryset.filter(stock__lt=F('stock_minimo'))
         
         return queryset.order_by('-ultima_actualizacion')
     
@@ -387,8 +519,8 @@ class InventarioViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def stock_bajo(self, request):
-        """Obtener productos con stock bajo (cantidad_entradas < stock_minimo)"""
-        inventario_bajo = self.queryset.filter(cantidad_entradas__lt=F('stock_minimo'))
+        """Obtener productos con stock bajo (stock < stock_minimo)"""
+        inventario_bajo = self.queryset.filter(stock__lt=F('stock_minimo'))
         serializer = self.get_serializer(inventario_bajo, many=True)
         
         return Response({
@@ -400,8 +532,8 @@ class InventarioViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def alertas(self, request):
         """Obtener alertas de inventario (stock bajo o por encima del máximo)"""
-        stock_bajo = self.queryset.filter(cantidad_entradas__lt=F('stock_minimo'))
-        stock_alto = self.queryset.filter(cantidad_entradas__gt=F('stock_maximo'))
+        stock_bajo = self.queryset.filter(stock__lt=F('stock_minimo'))
+        stock_alto = self.queryset.filter(stock__gt=F('stock_maximo'))
         
         return Response({
             'success': True,

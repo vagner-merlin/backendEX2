@@ -7,31 +7,21 @@ class ProductoBasicoSerializer(serializers.ModelSerializer):
     """Serializer básico para mostrar info del producto en el carrito"""
     class Meta:
         model = Producto
-        fields = ['id', 'nombre', 'descripcion', 'peso']
+        fields = ['id', 'nombre', 'descripcion', 'activo']
 
 class ProductoCategoriaBasicoSerializer(serializers.ModelSerializer):
     """Serializer para mostrar variante del producto con todas sus imágenes"""
     producto_info = ProductoBasicoSerializer(source='producto', read_only=True)
-    categoria_info = serializers.SerializerMethodField()
     imagenes = serializers.SerializerMethodField()
     imagen_principal = serializers.SerializerMethodField()
     
     class Meta:
         model = Producto_Variantes
         fields = [
-            'id', 'producto', 'categoria', 'color', 'talla', 'capacidad', 
-            'precio_unitario', 'stock', 'producto_info', 'categoria_info',
+            'id', 'producto', 'color', 'talla',
+            'precio_unitario', 'activo', 'producto_info',
             'imagenes', 'imagen_principal'
         ]
-    
-    def get_categoria_info(self, obj):
-        """Obtiene nombre de la categoría"""
-        if obj.categoria:
-            return {
-                'id': obj.categoria.id,
-                'nombre': obj.categoria.nombre
-            }
-        return None
     
     def get_imagenes(self, obj):
         """Obtiene todas las imágenes de la variante"""
@@ -86,11 +76,13 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("La cantidad debe ser mayor a 0")
         return value
     
-    def validate_producto_variante(self, value):
-        """Valida que el producto tenga stock disponible"""
-        if not value.stock or value.stock <= 0:
-            raise serializers.ValidationError("Producto sin stock disponible")
-        return value
+    # Nota: La validación de stock está comentada porque Producto_Variantes
+    # no tiene campo 'stock'. Debe agregarse al modelo o usar Inventario.
+    # def validate_producto_variante(self, value):
+    #     """Valida que el producto tenga stock disponible"""
+    #     if not hasattr(value, 'stock') or not value.stock or value.stock <= 0:
+    #         raise serializers.ValidationError("Producto sin stock disponible")
+    #     return value
 
 class CarritoSerializer(serializers.ModelSerializer):
     """Serializer completo del carrito con todos sus items"""
@@ -128,8 +120,10 @@ class AgregarItemCarritoSerializer(serializers.Serializer):
     def validate_producto_variante_id(self, value):
         try:
             producto = Producto_Variantes.objects.get(id=value)
-            if not producto.stock or producto.stock <= 0:
-                raise serializers.ValidationError("Producto sin stock disponible")
+            # Nota: Validación de stock desactivada porque el modelo no tiene ese campo
+            # TODO: Agregar campo 'stock' a Producto_Variantes o implementar lógica con Inventario
+            # if not producto.stock or producto.stock <= 0:
+            #     raise serializers.ValidationError("Producto sin stock disponible")
             return value
         except Producto_Variantes.DoesNotExist:
             raise serializers.ValidationError("Producto no encontrado")
